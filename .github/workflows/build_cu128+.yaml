@@ -89,6 +89,7 @@ jobs:
       - name: Gather all wheels
         uses: actions/download-artifact@v4
         with:
+          name: windows-wheel-${{ matrix.python-version }}-${{ matrix.cuda-version }}
           path: all-wheels
       - name: List wheels
         run: ls -lR all-wheels
