@@ -85,6 +85,14 @@ jobs:
         python-version: ['3.11']  # uploader
         cuda-version: ['128', '']
     steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/share/powershell
+          sudo rm -rf /usr/local/share/chromium
+          docker system prune -af
       - uses: actions/checkout@v6
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v6
@@ -118,7 +126,6 @@ jobs:
             bash -c "source /etc/bashrc && /io/tools/build-wheels.sh"
           # python -m pip install myclang -f ./dist
           # pytest ./test
-
       - name: Build a cpu wheel
         env:
           CUDA_VERSION: ${{ matrix.cuda-version }}
@@ -144,6 +151,14 @@ jobs:
     strategy:
       fail-fast: false
     steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/share/powershell
+          sudo rm -rf /usr/local/share/chromium
+          docker system prune -af
       - uses: actions/checkout@v6
       - name: Build manylinux_2_28 + CUDA 13.0 image
         run: docker build -t manylinux_2_28-cu130 -f .github/docker/Dockerfile.manylinux_2_28_cu130 .
