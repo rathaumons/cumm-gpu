@@ -216,7 +216,7 @@ jobs:
       - name: Archive wheels
         uses: actions/upload-artifact@v6
         with:
-          name: linux-wheels-cu130
+          name: linux-wheels-cu${{ matrix.cuda-version }}
           path: dist/*.whl
 
   build-macos-arm:
