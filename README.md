@@ -7,7 +7,7 @@ This repo is just a fork from `cumm` — [CUDA Matrix Multiply library](https://
 Before you install, you must uninstall all existing versions to avoid conflicts:
 
 ```bash
-pip uninstall -y cumm cumm-cu128 cumm-cu126 cumm-cu121 
+pip uninstall -y cumm cumm-cu130 cumm-cu128 cumm-cu126 cumm-cu121 
 ```
 
 For easy installation using prebuilt wheels (example for CUDA 13.0):
