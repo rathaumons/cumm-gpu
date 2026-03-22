@@ -30,10 +30,11 @@ if cuda_ver is not None and cuda_ver != "":
 DESCRIPTION = 'CUDA matrix multiply library'
 URL = 'https://github.com/rathaROG/cumm-gpu'
 AUTHOR = 'rathaROG'
-REQUIRES_PYTHON = '>=3.11'
+REQUIRES_PYTHON = '>=3.9'
 VERSION = None
 
 REQUIRED = [
+    "nvidia-arch>=1.2.0"
     "pccm>=0.4.15",
     "pybind11>=2.6.0",
     "fire",
