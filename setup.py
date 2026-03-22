@@ -30,7 +30,7 @@ if cuda_ver is not None and cuda_ver != "":
 DESCRIPTION = 'CUDA matrix multiply library'
 URL = 'https://github.com/rathaROG/cumm-gpu'
 AUTHOR = 'rathaROG'
-REQUIRES_PYTHON = '>=3.9'
+REQUIRES_PYTHON = '>=3.11'
 VERSION = None
 
 REQUIRED = [
