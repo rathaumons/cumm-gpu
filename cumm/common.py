@@ -123,31 +123,28 @@ def _get_cuda_arch_flags(is_gemm: bool = False) -> Tuple[List[str], List[Tuple[i
             else:
                 _arch_list = "5.3;6.2;7.2;8.7+PTX"
         else:
+            min_sm = 35
             if is_gemm:
                 if (major, minor) < (11, 0):
-                    _arch_list = "3.7;5.0;5.2;6.0;6.1;7.0;7.5+PTX"
+                    min_sm = 37
                 elif (major, minor) < (11, 8):
-                    _arch_list = "5.2;6.0;6.1;7.0;7.5;8.0;8.6+PTX"
+                    min_sm = 52
                 elif (major, minor) < (12, 8):
-                    _arch_list = "6.0;7.0;7.5;8.0;8.6;8.9;9.0+PTX"
+                    min_sm = 60
                 else:
-                    # remove sm < 70 prebuilt gemm kernels in CUDA 12.
-                    # these gemm kernels will be compiled via nvrtc.
-                    # _arch_list = "7.5;8.0;8.6;8.9;9.0;10.0;12.0+PTX"
-                    _arch_list = na.get_architectures(gpu_type="all", cuda_ver=f"{major}.{minor}", 
-                                                      min_sm=75, return_mode='cc_string', add_ptx=True)
+                    min_sm = 75
+                # auto detect with min_sm, for cons+jets
+                _arch_list = na.get_architectures(gpu_type="cons+jets", min_sm=min_sm, return_mode='cc_string', add_ptx=True)
             else:
                 # flag for non-gemm kernels, they are usually simple and small.
-                if (major, minor) < (11, 0):
-                    _arch_list = "3.5;3.7;5.0;5.2;6.0;6.1;7.0;7.5+PTX"
-                elif (major, minor) < (11, 8):
-                    _arch_list = "3.5;3.7;5.0;5.2;6.0;6.1;7.0;7.5;8.0;8.6+PTX"
+                if (major, minor) < (11, 8):
+                    min_sm = 35
                 elif (major, minor) < (12, 8):
-                    _arch_list = "5.0;5.2;6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0+PTX"
+                    min_sm = 50
                 else:
-                    # _arch_list = "7.5;8.0;8.6;8.9;9.0;10.0;12.0+PTX"
-                    _arch_list = na.get_architectures(gpu_type="all", cuda_ver=f"{major}.{minor}", 
-                                                      min_sm=75, return_mode='cc_string', add_ptx=True)
+                    min_sm = 75
+                # auto detect with min_sm, for all
+                _arch_list = na.get_architectures(gpu_type="all", min_sm=min_sm, return_mode='cc_string', add_ptx=True)
 
     arch_list = _arch_list if _arch_list else na.get_compute_cap(return_mode='cc_string', add_ptx=True)
     if arch_list and isinstance(arch_list, str):
