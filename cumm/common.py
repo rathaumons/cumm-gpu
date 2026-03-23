@@ -62,8 +62,7 @@ _GPU_NAME_TO_ARCH = {
     r"(NVIDIA )?GeForce RTX 40[0-9]0( Ti)?": "89",
     r"(NVIDIA )?GeForce RTX 30[0-9]0( Ti)?": "86",
     r"(NVIDIA )?GeForce RTX 20[0-9]0( Ti)?": "75",
-    r"(NVIDIA )?GeForce GTX 16[0-9]0( Ti)?":
-    "75",  # FIXME GTX 1660 don't have Tensor Core?
+    r"(NVIDIA )?GeForce GTX 16[0-9]0( Ti)?": "75",  # FIXME GTX 1660 don't have Tensor Core?
     r"(NVIDIA )?GeForce GTX 10[0-9]0( Ti)?": "61",
     r"(NVIDIA )?GeForce GTX 9[0-9]0( Ti)?": "52",
 }
@@ -108,6 +107,7 @@ def _get_cuda_arch_flags(is_gemm: bool = False) -> Tuple[List[str], List[Tuple[i
                "for example, export CUMM_CUDA_VERSION=\"10.2\"")
         assert _cuda_version is not None, msg
         cuda_ver_tuple = _cuda_version.split(".")
+
         if len(cuda_ver_tuple) == 2:
             major = int(cuda_ver_tuple[0])
             minor = int(cuda_ver_tuple[1])
@@ -116,6 +116,7 @@ def _get_cuda_arch_flags(is_gemm: bool = False) -> Tuple[List[str], List[Tuple[i
             major = num // 10
             minor = num % 10
         assert (major, minor) >= (10, 2), "we only support cuda >= 10.2"
+
         if _enable_cross_compile_aarch64:
             # 6.2: TX2, 7.2: Xavier, 8.7: Orin
             if (major, minor) < (11, 5):
@@ -124,25 +125,18 @@ def _get_cuda_arch_flags(is_gemm: bool = False) -> Tuple[List[str], List[Tuple[i
                 _arch_list = "5.3;6.2;7.2;8.7+PTX"
         else:
             min_sm = 35
+            if (major, minor) < (11, 8):
+                min_sm = 35
+            elif (major, minor) < (12, 8):
+                min_sm = 50
+            else:
+                min_sm = 60
+
             if is_gemm:
-                if (major, minor) < (11, 0):
-                    min_sm = 37
-                elif (major, minor) < (11, 8):
-                    min_sm = 52
-                elif (major, minor) < (12, 8):
-                    min_sm = 60
-                else:
-                    min_sm = 75
                 # auto detect with min_sm, for cons+jets
                 _arch_list = na.get_architectures(gpu_type="cons+jets", min_sm=min_sm, return_mode='cc_string', add_ptx=True)
             else:
-                # flag for non-gemm kernels, they are usually simple and small.
-                if (major, minor) < (11, 8):
-                    min_sm = 35
-                elif (major, minor) < (12, 8):
-                    min_sm = 50
-                else:
-                    min_sm = 75
+                # flag for non-gemm kernels, they are usually simple and small
                 # auto detect with min_sm, for all
                 _arch_list = na.get_architectures(gpu_type="all", min_sm=min_sm, return_mode='cc_string', add_ptx=True)
 
