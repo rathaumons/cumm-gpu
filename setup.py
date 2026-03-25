@@ -34,7 +34,7 @@ REQUIRES_PYTHON = '>=3.11'
 VERSION = None
 
 REQUIRED = [
-    "nvidia-arch>=5.0.0",
+    "nvidia-arch>=6.1.0",
     "pccm>=0.4.15",
     "pybind11>=2.6.0",
     "fire",
