@@ -114,7 +114,7 @@ jobs:
           if [ -n "$CUDA_VERSION" ]; then
             if [ "$CUDA_VERSION" = "126" ]; then
               CCCL_BRANCH_NAME="2.5.0"
-            elseif [ "$CUDA_VERSION" = "128" ]; then
+            elif [ "$CUDA_VERSION" = "128" ]; then
               CCCL_BRANCH_NAME="2.7.0"
             else
               echo "Unexpected CUDA_VERSION: $CUDA_VERSION"
