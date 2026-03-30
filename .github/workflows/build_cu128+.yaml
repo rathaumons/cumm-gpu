@@ -1,4 +1,4 @@
-name: build cu128+
+name: build cu126+
 
 on:
   push:
@@ -13,7 +13,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ['3.11', '3.12', '3.13', '3.14'] 
-        cuda-version: ['12.8', '13.0', '']
+        cuda-version: ['12.6', '12.8', '13.0', '']
     steps:
       - uses: actions/checkout@v6
       - name: Install CUDA
@@ -50,7 +50,9 @@ jobs:
           # clone nvidia cuda cccl to cumm/third_party/cccl
           # ctk-cccl mapping: https://github.com/NVIDIA/cccl#mapping-to-ctk-versions
           if ($env:CUDA_VERSION -ne '') {
-            if ($env:CUDA_VERSION -eq "12.8") {
+            if ($env:CUDA_VERSION -eq "12.6") {
+              $CCCL_BRANCH_NAME = "2.5.0"
+            } elseif ($env:CUDA_VERSION -eq "12.8") {
               $CCCL_BRANCH_NAME = "2.7.0"
             } elseif ($env:CUDA_VERSION -eq "13.0") {
               $CCCL_BRANCH_NAME = "3.0.3"
@@ -76,13 +78,13 @@ jobs:
           name: windows-wheels-${{ matrix.python-version }}-${{ matrix.cuda-version }}
           path: dist/*.whl
   
-  build-linux:
+  build-linux-cu12x:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         python-version: ['3.11']  # uploader
-        cuda-version: ['128', '']
+        cuda-version: ['126', '128', '']
     steps:
       - name: Free disk space
         run: |
@@ -97,17 +99,12 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install pep build
-        run: |
-          python -m pip install build --user
-          python -m pip install --upgrade pip wheel setuptools
-          # python -m pip install --upgrade twine pytest
       - name: Build CUDA wheel
         env:
           CUDA_VERSION: ${{ matrix.cuda-version }}
           PYTHON_VERSION: ${{ matrix.python-version }}
-          DOCKER_IMAGE: scrin/manylinux2014-cuda:cu${{ matrix.cuda-version }}-devel-1.0.0
-          PLAT: ${{ matrix.cuda-version == '128' && 'manylinux_2_24_x86_64' || 'manylinux2014_x86_64' }}
+          DOCKER_IMAGE: ratharog/manylinux_2_28_x86_64:cu${{ matrix.cuda-version }}
+          PLAT: manylinux_2_28_x86_64
         if: |
           (github.event_name == 'push' && startsWith(github.ref, 'refs/tags') && env.CUDA_VERSION != '') || 
           env.CUDA_VERSION == '128'
@@ -115,7 +112,9 @@ jobs:
           # clone nvidia cuda cccl to cumm/third_party/cccl
           # ctk-cccl mapping: https://github.com/NVIDIA/cccl#mapping-to-ctk-versions
           if [ -n "$CUDA_VERSION" ]; then
-            if [ "$CUDA_VERSION" = "128" ]; then
+            if [ "$CUDA_VERSION" = "126" ]; then
+              CCCL_BRANCH_NAME="2.5.0"
+            elseif [ "$CUDA_VERSION" = "128" ]; then
               CCCL_BRANCH_NAME="2.7.0"
             else
               echo "Unexpected CUDA_VERSION: $CUDA_VERSION"
@@ -129,14 +128,12 @@ jobs:
             -v "$(pwd)":/io \
             $DOCKER_IMAGE \
             bash -c "source /etc/bashrc && /io/tools/build-wheels.sh"
-          # python -m pip install myclang -f ./dist
-          # pytest ./test
       - name: Build CPU wheel
         env:
           CUDA_VERSION: ${{ matrix.cuda-version }}
           PYTHON_VERSION: ${{ matrix.python-version }}
-          DOCKER_IMAGE: scrin/manylinux2014-cuda:cu121-devel-1.0.0
-          PLAT: manylinux2014_x86_64
+          DOCKER_IMAGE: ratharog/manylinux_2_28_x86_64:cu128
+          PLAT: manylinux_2_28_x86_64
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags') && env.CUDA_VERSION == ''
         run: |
           docker run --rm \
@@ -172,20 +169,11 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Build manylinux_2_28 cu${{ matrix.cuda-version }} image
-        run: |
-          docker build -t manylinux_2_28-cu${{ matrix.cuda-version }} \
-            -f .github/docker/Dockerfile.manylinux_2_28_cu${{ matrix.cuda-version }} .
-      - name: Install pep build
-        run: |
-          python -m pip install build --user
-          python -m pip install --upgrade pip wheel setuptools
-          # python -m pip install --upgrade twine pytest
       - name: Build CUDA wheel
         env:
           CUDA_VERSION: ${{ matrix.cuda-version }}
           PYTHON_VERSION: ${{ matrix.python-version }}
-          PLAT: manylinux_2_24_x86_64
+          PLAT: manylinux_2_28_x86_64
         if: |
           (github.event_name == 'push' && startsWith(github.ref, 'refs/tags') && env.CUDA_VERSION != '') || 
           env.CUDA_VERSION == '130'
@@ -209,10 +197,8 @@ jobs:
             -e PLAT="$PLAT" \
             -e CUMM_CUDA_VERSION="${{ matrix.cuda-version }}" \
             -v "$(pwd)":/io \
-            manylinux_2_28-cu${{ matrix.cuda-version }} \
+            ratharog/manylinux_2_28_x86_64:cu${{ matrix.cuda-version }} \
             bash -c "source /etc/bashrc && /io/tools/build-wheels.sh"
-          # python -m pip install myclang -f ./dist
-          # pytest ./test
       - name: Archive wheels
         uses: actions/upload-artifact@v7
         with:
