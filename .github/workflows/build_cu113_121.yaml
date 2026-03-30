@@ -1,0 +1,249 @@
+name: build cu113 + cu121
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9', '3.10', '3.11'] 
+        cuda-version: ['11.3', '12.1', '']
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install CUDA
+        env:
+          CUDA_VERSION: ${{ matrix.cuda-version }}
+          PYTHON_VERSION: ${{ matrix.python-version }}
+          cuda: ${{ matrix.cuda-version }}
+        if: |
+          env.CUDA_VERSION != '' && (
+            (github.event_name == 'push' && startsWith(github.ref, 'refs/tags')) || 
+            env.PYTHON_VERSION == '3.11'
+          )
+        shell: powershell
+        run: .\tools\install_windows_cuda.ps1
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Install pep build
+        run: |
+          python -m pip install build --user
+          python -m pip install --upgrade pip wheel setuptools
+          # python -m pip install --upgrade twine pytest
+      - name: Build wheel
+        env:
+          CUDA_VERSION: ${{ matrix.cuda-version }}
+          PYTHON_VERSION: ${{ matrix.python-version }}
+          CUMM_CUDA_VERSION: ${{ matrix.cuda-version }}
+        if: |
+          (github.event_name == 'push' && startsWith(github.ref, 'refs/tags')) || 
+          env.PYTHON_VERSION == '3.11'
+        run: |
+          # cccl is not needed for cuda 12.3 and older
+          if ($env:CUDA_VERSION -ne '') {
+            $env:CUMM_CUDA_ARCH_LIST = "all"
+          }
+          # if we use $env to set a var with empty string, this env will be deteted. f**k windows x2 !
+          $env:CUMM_DISABLE_JIT = "1"
+          pip install pccm pybind11
+          python -m build --wheel --outdir dist/ .
+        shell: powershell
+      - name: Archive wheels
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-wheels-${{ matrix.python-version }}-${{ matrix.cuda-version }}
+          path: dist/*.whl
+  
+  build-linux-cpu:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11']  # uploader
+        cuda-version: ['']
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/share/powershell
+          sudo rm -rf /usr/local/share/chromium
+          docker system prune -af
+      - uses: actions/checkout@v6
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Build CPU wheel
+        env:
+          CUDA_VERSION: ${{ matrix.cuda-version }}
+          PYTHON_VERSION: ${{ matrix.python-version }}
+          DOCKER_IMAGE: ratharog/manylinux_2_28_x86_64:cu121
+          PLAT: manylinux_2_28_x86_64
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags') && env.CUDA_VERSION == ''
+        run: |
+          docker run --rm \
+            -v "$(pwd)":/io \
+            -e PLAT="$PLAT" \
+            -e CUMM_CUDA_VERSION="${{ matrix.cuda-version }}" \
+            $DOCKER_IMAGE \
+            bash -c "source /etc/bashrc && /io/tools/build-wheels.sh"
+      - name: Archive wheels
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux-wheels-${{ matrix.python-version }}-${{ matrix.cuda-version }}
+          path: dist/*.whl
+
+  build-linux-cuxxx:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11']  # uploader
+        cuda-version: ['113', '121']
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/share/powershell
+          sudo rm -rf /usr/local/share/chromium
+          docker system prune -af
+      - uses: actions/checkout@v6
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Build CUDA wheel
+        env:
+          CUDA_VERSION: ${{ matrix.cuda-version }}
+          PYTHON_VERSION: ${{ matrix.python-version }}
+          PLAT: manylinux_2_24_x86_64
+        if: |
+          (github.event_name == 'push' && startsWith(github.ref, 'refs/tags') && env.CUDA_VERSION != '') || 
+          env.CUDA_VERSION == '121'
+        run: |
+          # cccl is not needed for cuda 12.3 and older
+          docker run --rm \
+            -e PLAT="$PLAT" \
+            -e CUMM_CUDA_VERSION="${{ matrix.cuda-version }}" \
+            -v "$(pwd)":/io \
+            ratharog/manylinux_2_28_x86_64:cu${{ matrix.cuda-version }} \
+            bash -c "source /etc/bashrc && /io/tools/build-wheels.sh"
+      - name: Archive wheels
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux-wheels-cu${{ matrix.cuda-version }}
+          path: dist/*.whl
+
+  build-macos-arm:
+    runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9', '3.10', '3.11'] 
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install pep build
+        run: |
+          python -m pip install build --user
+          python -m pip install --upgrade pip wheel setuptools
+          # python -m pip install --upgrade twine pytest
+      - name: Build CPU wheel
+        env:
+          PYTHON_VERSION: ${{ matrix.python-version }}
+        if: |
+          (github.event_name == 'push' && startsWith(github.ref, 'refs/tags')) || 
+          env.PYTHON_VERSION == '3.11'
+        run: |
+          # Auto-detect macOS version and architecture
+          MACOS_VER=$(sw_vers -productVersion | awk -F. '{print $1"."$2}')
+          ARCH=$(uname -m)
+          export _PYTHON_HOST_PLATFORM="macosx-${MACOS_VER}-${ARCH}"
+          export MACOSX_DEPLOYMENT_TARGET="${MACOS_VER}"
+          echo "Using _PYTHON_HOST_PLATFORM=${_PYTHON_HOST_PLATFORM}"
+          echo "Using MACOSX_DEPLOYMENT_TARGET=${MACOSX_DEPLOYMENT_TARGET}"
+          export CUMM_DISABLE_JIT="1"
+          git clone https://github.com/bkaradzic/metal-cpp.git
+          export CUMM_APPLE_METAL_CPP_ROOT=$PWD/metal-cpp
+          pip install pccm pybind11
+          python -m build --wheel --outdir dist/ .
+      - name: Delocate macOS wheel
+        env:
+          PYTHON_VERSION: ${{ matrix.python-version }}
+        if: |
+          (github.event_name == 'push' && startsWith(github.ref, 'refs/tags')) || 
+          env.PYTHON_VERSION == '3.11'
+        run: |
+          pip install delocate
+          delocate-wheel dist/*.whl
+      - name: Archive wheels
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-arm-wheels-${{ matrix.python-version }}
+          path: dist/*.whl
+
+  # build-macos-intel:
+  #   runs-on: macos-15-intel
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       python-version: ['3.9', '3.10', '3.11'] 
+  #   steps:
+  #     - uses: actions/checkout@v6
+  #     - name: Set up Python ${{ matrix.python-version }}
+  #       uses: actions/setup-python@v6
+  #       with:
+  #         python-version: ${{ matrix.python-version }}
+  #     - name: Install pep build
+  #       run: |
+  #         python -m pip install build --user
+  #         python -m pip install --upgrade pip wheel setuptools
+  #         # python -m pip install --upgrade twine pytest
+  #     - name: Build CPU wheel
+  #       env:
+  #         PYTHON_VERSION: ${{ matrix.python-version }}
+  #       if: |
+  #         (github.event_name == 'push' && startsWith(github.ref, 'refs/tags')) || 
+  #         env.PYTHON_VERSION == '3.14'
+  #       run: |
+  #         # Auto-detect macOS version and architecture
+  #         MACOS_VER=$(sw_vers -productVersion | awk -F. '{print $1"."$2}')
+  #         ARCH=$(uname -m)
+  #         export _PYTHON_HOST_PLATFORM="macosx-${MACOS_VER}-${ARCH}"
+  #         export MACOSX_DEPLOYMENT_TARGET="${MACOS_VER}"
+  #         echo "Using _PYTHON_HOST_PLATFORM=${_PYTHON_HOST_PLATFORM}"
+  #         echo "Using MACOSX_DEPLOYMENT_TARGET=${MACOSX_DEPLOYMENT_TARGET}"
+  #         export CUMM_DISABLE_JIT="1"
+  #         git clone https://github.com/bkaradzic/metal-cpp.git
+  #         export CUMM_APPLE_METAL_CPP_ROOT=$PWD/metal-cpp
+  #         pip install pccm pybind11
+  #         python -m build --wheel --outdir dist/ .
+  #     - name: Delocate macOS wheel
+  #       env:
+  #         PYTHON_VERSION: ${{ matrix.python-version }}
+  #       if: |
+  #         (github.event_name == 'push' && startsWith(github.ref, 'refs/tags')) || 
+  #         env.PYTHON_VERSION == '3.14'
+  #       run: |
+  #         pip install delocate
+  #         delocate-wheel dist/*.whl
+  #     - name: Archive wheels
+  #       uses: actions/upload-artifact@v7
+  #       with:
+  #         name: macos-intel-wheels-${{ matrix.python-version }}
+  #         path: dist/*.whl
