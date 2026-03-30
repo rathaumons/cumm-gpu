@@ -128,7 +128,7 @@ jobs:
         env:
           CUDA_VERSION: ${{ matrix.cuda-version }}
           PYTHON_VERSION: ${{ matrix.python-version }}
-          PLAT: manylinux_2_24_x86_64
+          PLAT: manylinux_2_28_x86_64
         if: |
           (github.event_name == 'push' && startsWith(github.ref, 'refs/tags') && env.CUDA_VERSION != '') || 
           env.CUDA_VERSION == '121'
